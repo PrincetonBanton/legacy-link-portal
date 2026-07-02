@@ -3,28 +3,61 @@
     <div class="split-layout">
       
       <div class="left-col">
-        <div class="step-testing-panel" style="margin-bottom: 1.5rem; padding: 1rem; border: 1px dashed #cbd5e1; border-radius: 6px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+        <div class="step-testing-panel">
           <button 
-            class="pipeline-btn" 
-            :class="{ 'theme-emerald': activeDatasetType === 'trends' }"
+            class="pipeline-btn theme-emerald" 
+            :class="{ 'is-active': activeDatasetType === 'trends' }"
             @click="handleFetchTrendsClick" 
             :disabled="isFetching"
           >
-            {{ isFetching && activeDatasetType === 'trends' ? 'Fetching...' : '1. Trends 📈' }}
+            {{ isFetching && activeDatasetType === 'trends' ? 'Fetching...' : 'Invoice' }}
           </button>
 
           <button 
-            class="pipeline-btn" 
-            :class="{ 'theme-sky': activeDatasetType === 'blocks' }"
+            class="pipeline-btn theme-sky" 
+            :class="{ 'is-active': activeDatasetType === 'blocks' }"
             @click="handleFetchBlocksClick" 
             :disabled="isFetching"
           >
-            {{ isFetching && activeDatasetType === 'blocks' ? 'Fetching...' : '2. Blocks 🧱' }}
+            {{ isFetching && activeDatasetType === 'blocks' ? 'Fetching...' : 'Blocking' }}
+          </button>
+
+          <button 
+            class="pipeline-btn theme-purple" 
+            :class="{ 
+              'is-active': activeDatasetType === 'products',
+              'system-restricted': props.selectedContext?.systemType !== 'Production System'
+            }"
+            @click="handleFetchProductsClick" 
+            :disabled="isFetching || props.selectedContext?.systemType !== 'Production System'"
+          >
+            {{ isFetching && activeDatasetType === 'products' ? 'Fetching...' : 'Product' }}
+          </button>
+
+          <button 
+            class="pipeline-btn theme-pink" 
+            :class="{ 
+              'is-active': activeDatasetType === 'groups',
+              'system-restricted': props.selectedContext?.systemType === 'Production System'
+            }"
+            @click="handleFetchGroupsClick" 
+            :disabled="isFetching || props.selectedContext?.systemType === 'Production System'"
+          >
+            {{ isFetching && activeDatasetType === 'groups' ? 'Fetching...' : 'Category' }}
+          </button>
+
+          <button 
+            class="ai-trigger-btn" 
+            @click="runDynamicDatasetAnalysis" 
+            :disabled="isGenerating || !currentTableRows?.length"
+            :title="`Analyze ${activeDatasetType.toUpperCase()} Dataset`"
+          >
+            <span>{{ isGenerating ? 'Computing...' : 'Run AI ✨' }}</span>
           </button>
         </div>
 
         <div class="table-container">
-          <h3>📊 Live {{ activeDatasetType === 'trends' ? 'Daily Operational Trends' : 'Sector Block Aggregations' }}</h3>
+          <h3>📊 Live {{ getTableTitle }}</h3>
           
           <div class="table-scroll-wrapper">
             <table class="mock-table">
@@ -38,11 +71,19 @@
                   <th>Block Identifier</th>
                   <th>Total Value</th>
                 </tr>
+                <tr v-else-if="activeDatasetType === 'products'">
+                  <th>Product Variant Code</th>
+                  <th>Aggregated Value</th>
+                </tr>
+                <tr v-else-if="activeDatasetType === 'groups'">
+                  <th>Logistical Group Class</th>
+                  <th>Aggregated Value</th>
+                </tr>
               </thead>
               <tbody>
                 <tr v-if="!currentTableRows || currentTableRows.length === 0">
-                  <td :colspan="activeDatasetType === 'trends' ? 3 : 2" style="text-align: center; color: #94a3b8; padding: 20px; font-style: italic;">
-                    No records found. Click one of the verification pipeline buttons above to stream data nodes.
+                  <td :colspan="activeDatasetType === 'trends' ? 3 : 2" class="empty-row-cell">
+                    No records found. Trigger an active pipeline node above.
                   </td>
                 </tr>
                 
@@ -53,8 +94,18 @@
                     <td class="revenue-cell">₱{{ Number(row.total_financial_value || 0).toLocaleString(undefined, { minimumFractionDigits: 2 }) }}</td>
                   </tr>
 
-                  <tr v-else-if="activeDatasetType === 'blocks'" v-for="(row, index) in currentTableRows" :key="'block-' + index">
+                  <tr v-if="activeDatasetType === 'blocks'" v-for="(row, index) in currentTableRows" :key="'block-' + index">
                     <td class="product-name-cell">{{ row.identifier }}</td>
+                    <td class="revenue-cell">₱{{ Number(row.value || 0).toLocaleString(undefined, { minimumFractionDigits: 2 }) }}</td>
+                  </tr>
+
+                  <tr v-if="activeDatasetType === 'products'" v-for="(row, index) in currentTableRows" :key="'prod-' + index">
+                    <td class="product-name-cell">{{ row.identifier || 'Unknown Product' }}</td>
+                    <td class="revenue-cell">₱{{ Number(row.value || 0).toLocaleString(undefined, { minimumFractionDigits: 2 }) }}</td>
+                  </tr>
+
+                  <tr v-if="activeDatasetType === 'groups'" v-for="(row, index) in currentTableRows" :key="'grp-' + index">
+                    <td class="product-name-cell">{{ row.group_name || row.identifier || 'Unknown Group' }}</td>
                     <td class="revenue-cell">₱{{ Number(row.value || 0).toLocaleString(undefined, { minimumFractionDigits: 2 }) }}</td>
                   </tr>
                 </template>
@@ -62,10 +113,6 @@
             </table>
           </div>
         </div>
-
-        <button class="action-btn" @click="runDynamicDatasetAnalysis" :disabled="isGenerating || !currentTableRows?.length">
-          {{ isGenerating ? 'Computing Business Insights...' : `Analyze ${activeDatasetType.toUpperCase()} Dataset 🚀` }}
-        </button>
       </div>
 
       <div class="right-col">
@@ -73,7 +120,6 @@
           <div class="panel-header">
             <strong>{{ hasError ? 'Diagnostic Error Log:' : 'AI Executive Summary:' }}</strong>
           </div>
-          
           <div class="insights-content">
             <p class="status-text">{{ aiResponse || 'Awaiting execution request. Click the action button to process the dataset grid matrix...' }}</p>
           </div>
@@ -95,26 +141,38 @@ const props = defineProps({
   }
 })
 
-// Extract both metrics states and pipeline engines from the global composable
 const { 
   isFetching, 
   dailyTrendsData, 
   blockMetricsData, 
+  productMetricsData, 
+  groupMetricsData, 
   fetchTrends, 
-  fetchBlockAggregations 
+  fetchBlockAggregations,
+  fetchProductAggregations,
+  fetchGroupAggregations
 } = useOwnerAnalysis()
 
-// Track which pipeline configuration we are analyzing right now
-const activeDatasetType = ref('trends') // 'trends' or 'blocks'
+const activeDatasetType = ref('trends')
 const isGenerating = ref(false)
 const aiResponse = ref('')
 const hasError = ref(false)
 
 const endpoint = 'https://api.groq.com/openai/v1/chat/completions'
 
-// 🌟 Computed property to feed the correct data matrix array to our loop engine
+const getTableTitle = computed(() => {
+  if (activeDatasetType.value === 'trends') return 'Daily Operational Trends'
+  if (activeDatasetType.value === 'blocks') return 'Sector Block Aggregations'
+  if (activeDatasetType.value === 'products') return 'Product Inventory Breakdown'
+  return 'Logistical Category Group Aggregations'
+})
+
 const currentTableRows = computed(() => {
-  return activeDatasetType.value === 'trends' ? dailyTrendsData.value : blockMetricsData.value
+  if (activeDatasetType.value === 'trends') return dailyTrendsData.value
+  if (activeDatasetType.value === 'blocks') return blockMetricsData.value
+  if (activeDatasetType.value === 'products') return productMetricsData.value
+  if (activeDatasetType.value === 'groups') return groupMetricsData.value
+  return []
 })
 
 const handleFetchTrendsClick = async () => {
@@ -131,11 +189,24 @@ const handleFetchBlocksClick = async () => {
   await fetchBlockAggregations(area, systemType, isoMinDate, isoMaxDate)
 }
 
-// 🌟 Dynamic AI Prompt Generator depending on which context step dataset is active
+const handleFetchProductsClick = async () => {
+  if (!props.selectedContext?.area) return alert("⚠️ No enterprise area chosen yet!")
+  activeDatasetType.value = 'products'
+  const { area, systemType, isoMinDate, isoMaxDate } = props.selectedContext
+  await fetchProductAggregations(area, systemType, isoMinDate, isoMaxDate)
+}
+
+const handleFetchGroupsClick = async () => {
+  if (!props.selectedContext?.area) return alert("⚠️ No enterprise area chosen yet!")
+  activeDatasetType.value = 'groups'
+  const { area, systemType, isoMinDate, isoMaxDate } = props.selectedContext
+  await fetchGroupAggregations(area, systemType, isoMinDate, isoMaxDate)
+}
+
 const runDynamicDatasetAnalysis = async () => {
   isGenerating.value = true
   hasError.value = false
-  aiResponse.value = `Analyzing active ${activeDatasetType.value} matrices and formatting balance matrix...`
+  aiResponse.value = `Analyzing active ${activeDatasetType.value} matrix distribution parameters...`
 
   const apiKey = import.meta.env.VITE_GROQ_API_KEY
   if (!apiKey) {
@@ -145,22 +216,23 @@ const runDynamicDatasetAnalysis = async () => {
     return
   }
 
-  // Generate dynamic contextual text instructions based on active tracking selection
-  const pipelineContextDesc = activeDatasetType.value === 'trends'
-    ? 'daily timeline operational metrics metrics (invoice counts and financial velocities)'
-    : 'sector operational block distributions (block identifiers and financial allocation points)'
+  let pipelineContextDesc = ''
+  if (activeDatasetType.value === 'trends') pipelineContextDesc = 'daily operational trends'
+  else if (activeDatasetType.value === 'blocks') pipelineContextDesc = 'sector operational blocks'
+  else if (activeDatasetType.value === 'products') pipelineContextDesc = 'deep item units and sales volumes'
+  else pipelineContextDesc = 'generalized logistical category groups'
 
   const requestBody = {
     model: "llama-3.1-8b-instant",
     messages: [
       { 
         role: "system", 
-        content: `You are an expert data analyst. Review the following snapshot data layer containing ${pipelineContextDesc}.
-Provide a brief, high-impact bulleted analysis using exactly these four structured headers:
-1. The Operational Pulse Audit (Executive Summary)
-2. Dynamic Anomaly Detection
-3. Preventive Maintenance / Action Items
-4. Projection`
+        content: `You are an expert data analyst, and data comes from agriculture crops operation mainly pomelo, durian, mango. Review the following snapshot data layer containing ${pipelineContextDesc}.
+                  Provide a brief, high-impact bulleted analysis using exactly these four structured headers:
+                    1. The Operational Pulse Audit (Executive Summary)
+                    2. Dynamic Anomaly Detection
+                    3. Preventive Maintenance / Action Items
+                    4. Projection`
       },
       { 
         role: "user", 
@@ -188,78 +260,72 @@ Provide a brief, high-impact bulleted analysis using exactly these four structur
   }
 }
 
-// 🔄 Watcher: Flushes data frames and text logs instantly when dropdown contexts change
 watch(
   () => props.selectedContext,
-  (newContext) => {
-    // 1. Flush the database caching targets to clear out old rows from the table layout
+  () => {
     if (dailyTrendsData.value) dailyTrendsData.value = []
     if (blockMetricsData.value) blockMetricsData.value = []
-    
-    // 2. Reset the AI response string block back to its baseline default waiting message
+    if (productMetricsData.value) productMetricsData.value = []
+    if (groupMetricsData.value) groupMetricsData.value = []
     aiResponse.value = ''
     hasError.value = false
-
-    if (newContext?.area && newContext?.systemType) {
-      console.log("🧹 Context changed! Cleared out old datasets and reset AI insights panel framework.")
-    }
   },
   { deep: true, immediate: true }
 )
-
 </script>
 
 <style scoped>
-.widescreen-analytics-hub { width: 100%; padding: 1.2rem; box-sizing: border-box; background: var(--bg-main); font-family: system-ui, sans-serif; height: 100%; display: flex; flex-direction: column; }
-.split-layout { display: flex; gap: 16px; align-items: stretch; width: 100%; flex: 1; min-height: 0; }
-.left-col { flex: 1.3; display: flex; flex-direction: column; min-width: 0; }
-.right-col { flex: 1; display: flex; min-width: 0; }
+/* Maximize Available Heights on Layout Containers */
+.widescreen-analytics-hub { width: 100%; min-height: 85vh; display: flex; padding: 2rem; box-sizing: border-box; background: #ffffff; font-family: system-ui, -apple-system, sans-serif; }
+.split-layout { display: flex; gap: 2.5rem; align-items: stretch; width: 100%; flex-grow: 1; }
+.left-col { flex: 1.2; display: flex; flex-direction: column; gap: 1.5rem; }
+.right-col { flex: 1; display: flex; }
 
-/* Base & State Rules */
-.pipeline-btn { margin: 0; width: auto; padding: 8px 16px; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; border-radius: 6px; cursor: pointer; border: 1px solid var(--btn-border, #cbd5e1); color: white; transition: background 0.15s, border-color 0.15s; }
-.pipeline-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.pipeline-btn.theme-emerald { background: #059669; border-color: #059669; }
-.pipeline-btn.theme-sky { background: #0284c7; border-color: #0284c7; }
-.pipeline-btn.active { background: #334155 !important; border-color: #334155 !important; }
+/* Upper Header Controls Dock without Dashed Border */
+.step-testing-panel { padding: 1rem; background: #f8fafc; border-radius: 8px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 
-/* 📊 Table Module & Wrapper Core */
-.table-container { text-align: left; display: flex; flex-direction: column; flex: 1; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; min-height: 0; }
-.table-container h3 { font-size: 0.68rem; color: var(--text-muted); margin: 0; padding: 10px 14px; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; border-bottom: 1px solid var(--border-color); background: var(--bg-surface); }
-.table-scroll-wrapper { flex: 1; overflow-y: auto; min-height: 0; }
+/* Control Selection Button and Hover State Logic */
+.pipeline-btn { margin: 0; width: auto; padding: 8px 16px; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; border-radius: 50px; cursor: pointer; border: 1px solid transparent; color: white; opacity: 0.45; transition: opacity 0.2s ease, transform 0.1s ease; }
+.pipeline-btn:hover:not(:disabled) { opacity: 0.85; transform: translateY(-1px); }
+.pipeline-btn.is-active { opacity: 1 !important; transform: none !important; }
+.pipeline-btn:disabled { cursor: not-allowed; }
 
-/* 🧾 Core Matrix Elements */
+/* System Context Filtering Behavior */
+.pipeline-btn.system-restricted { background: #64748b !important; opacity: 0.25 !important; cursor: not-allowed; }
+
+/* Background Theme Color Schemes */
+.pipeline-btn.theme-emerald { background: #10b981; }
+.pipeline-btn.theme-sky { background: #3b82f6; }
+.pipeline-btn.theme-purple { background: #8b5cf6; }
+.pipeline-btn.theme-pink { background: #ec4899; }
+
+/* Right-aligned Trigger Action Buttons */
+.ai-trigger-btn { margin-left: auto; background: #0f172a; color: white; border: none; padding: 8px 14px; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; border-radius: 50px; cursor: pointer; transition: background 0.15s ease, transform 0.1s ease; display: flex; align-items: center; gap: 4px; }
+.ai-trigger-btn:hover:not(:disabled) { background: #1e293b; transform: translateY(-1px); }
+.ai-trigger-btn:disabled { background: #cbd5e1; color: #94a3b8; cursor: not-allowed; }
+
+/* Grid View Scrolling Table Container Architecture */
+.table-container { text-align: left; display: flex; flex-direction: column; flex-grow: 1; width: 100%; }
+.table-container h3 { font-size: 0.9rem; color: #334155; margin: 0 0 1rem 0; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; }
+.table-scroll-wrapper { flex-grow: 1; max-height: 550px; overflow-y: auto; border: 1px solid #edf2f7; border-radius: 6px; background: #ffffff; }
 .mock-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; text-align: left; }
-.mock-table th { background: var(--bg-surface); color: var(--text-muted); padding: 8px 12px; border-bottom: 1px solid var(--border-color); font-weight: 800; font-size: 0.68rem; letter-spacing: 0.03em; position: sticky; top: 0; z-index: 10; }
-.mock-table td { padding: 6px 12px; border-bottom: 1px solid var(--border-color); color: var(--text-main); height: 32px; box-sizing: border-box; vertical-align: middle; transition: background 0.1s; }
-.mock-table tr:hover td { background: var(--btn-hover-bg); }
-.mock-table th.num, .mock-table td.num { text-align: right; }
+.mock-table th { background: #f8fafc; color: #64748b; padding: 12px; border-bottom: 1px solid #edf2f7; font-weight: 800; font-size: 0.68rem; letter-spacing: 0.03em; position: sticky; top: 0; z-index: 1; }
+.mock-table td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #334155; font-family: ui-monospace, SFMono-Regular, monospace; font-size: 0.75rem; box-sizing: border-box; vertical-align: middle; }
+.product-name-cell { font-family: system-ui, sans-serif !important; font-weight: 600; color: #0f172a !important; }
+.revenue-cell { font-weight: 600; color: #16a34a; }
+.mock-table tr:hover td { background: #f8fafc; }
+.empty-row-cell { text-align: center; color: #94a3b8; padding: 30px; font-style: italic; }
 
-/* 🔤 Font & Context Classes */
-.font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.75rem; }
-.product-name-cell { font-weight: 600; color: var(--text-main); }
-.revenue-cell { font-weight: 700; color: #10b981; }
-.code-text { font-weight: 700; color: #0284c7; font-size: 0.72rem; }
-:global(.dark-theme) .code-text { color: #38bdf8 !important; }
-.empty-msg { text-align: center; color: var(--text-muted); padding: 40px !important; font-size: 0.75rem; font-weight: 600; font-style: italic; }
+/* Lateral Insight Display Flex Architecture */
+.insights-panel { padding: 1.5rem; background: #f0fdf4; border-left: 4px solid #22c55e; border-radius: 8px; text-align: left; width: 100%; display: flex; flex-direction: column; flex-grow: 1; box-sizing: border-box; }
+.awaiting-panel { background: #f8fafc; border-left-color: #cbd5e1; }
+.error-panel { background: #fef2f2; border-left-color: #ef4444; }
+.panel-header { font-size: 0.68rem; color: #166534; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; margin-bottom: 1rem; border-bottom: 1px dashed rgba(0,0,0,0.08); padding-bottom: 6px; }
+.awaiting-panel .panel-header { color: #475569; }
+.error-panel .panel-header { color: #991b1b; }
+.insights-content { flex-grow: 1; overflow-y: auto; max-height: 580px; padding-right: 6px; }
+.status-text { color: #1e293b; font-size: 0.78rem; margin: 0; line-height: 1.6; white-space: pre-line; }
+.awaiting-panel .status-text { color: #94a3b8; font-style: italic; font-weight: 600; }
 
-/* 🚀 Pipeline Control Button System */
-.action-btn { background: transparent; border: 1px solid var(--btn-border); color: var(--text-muted); font-size: 0.72rem; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; padding: 6px 14px; border-radius: 6px; cursor: pointer; transition: all 0.2s ease; width: 100%; height: 36px; margin-top: 12px; box-sizing: border-box; }
-.action-btn:hover:not(:disabled) { color: #10b981; border-color: #10b981; background: var(--btn-hover-bg); box-shadow: 0 0 6px rgba(16, 185, 129, 0.15); }
-.action-btn:disabled { opacity: 0.4; cursor: not-allowed; border-color: var(--border-color) !important; color: var(--text-muted) !important; box-shadow: none !important; }
-
-/* 🧠 Intelligence Executive Insights Panels */
-.insights-panel { padding: 1.2rem; background: rgba(16, 185, 129, 0.04); border: 1px solid var(--border-color); border-left: 4px solid #10b981; border-radius: 8px; text-align: left; width: 100%; display: flex; flex-direction: column; box-sizing: border-box; }
-.panel-header { font-size: 0.65rem; color: #10b981; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 1rem; border-bottom: 1px dashed var(--border-color); padding-bottom: 8px; }
-.insights-content { flex-grow: 1; overflow-y: auto; padding-right: 4px; }
-.status-text { color: var(--text-main); font-size: 0.76rem; margin: 0; line-height: 1.6; white-space: pre-line; }
-
-/* 🎨 Panel State Context Modifications */
-.awaiting-panel { background: var(--bg-surface); border-left-color: var(--border-color); }
-.awaiting-panel .panel-header, .awaiting-panel .status-text { color: var(--text-muted); }
-.awaiting-panel .status-text { font-style: italic; font-weight: 600; }
-.error-panel { background: rgba(220, 38, 38, 0.04); border-left-color: #dc2626; }
-.error-panel .panel-header, .error-panel .status-text { color: #dc2626; }
-.error-panel .status-text { font-family: ui-monospace, monospace; font-size: 0.72rem; }
-
-@media (max-width: 1024px) { .split-layout { flex-direction: column; gap: 16px; } .right-col { min-height: 250px; } }
+@media (max-width: 900px) { .split-layout { flex-direction: column; gap: 2rem; } }
 </style>

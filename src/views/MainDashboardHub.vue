@@ -58,6 +58,8 @@
         <button class="theme-toggle-btn" @click="themeCtx.toggleTheme()" :title="themeCtx.isDarkMode.value ? 'Switch to Light' : 'Switch to Dark'">
           <span class="theme-icon">{{ themeCtx.isDarkMode.value ? '☀️' : '🌙' }}</span>
         </button>
+
+        <button class="signout-btn" @click="emit('sign-out')">SIGN OUT</button>
       </div>
     </nav>
 
@@ -80,8 +82,9 @@ import { transformGroupedSummaryToSegments } from '../utils/dataTransformers.js'
 import { convertToISODate } from '../utils/dateUtils.js'
 import OperationsView from './OperationsView.vue'
 import InventoryView from './InventoryView.vue'
-import AnalyticsView from './AnalyticsView.vue' // 🚀 Imported your template target view
+import AnalyticsView from './AnalyticsView.vue'
 
+const emit = defineEmits(['sign-out'])
 const themeCtx = inject('theme')
 const { 
   groupedSummary, 
@@ -105,7 +108,6 @@ onMounted(() => {
   loadEnterpriseData() 
 })
 
-// 🚀 Synchronize background aggregation states when changing selectors on the Analytics tab
 watch(activeDashboardArea, (newContext) => {
   if (!newContext || currentView.value !== 'analytics') return
   triggerMetricsPipeline(newContext)
@@ -177,12 +179,10 @@ const handleAnalyticsClick = async () => {
   currentView.value = 'analytics'
 }
 
-// Helper core pipeline dispatcher to ensure cache layers populate for analytics context mapping
 const triggerMetricsPipeline = (context) => {
   const { area, systemType, isoMinDate, isoMaxDate } = context
   fetchTrends(area, systemType, isoMinDate, isoMaxDate)
   fetchBlockAggregations(area, systemType, isoMinDate, isoMaxDate)
-  
   if (systemType === 'Production System') {
     fetchProductAggregations(area, systemType, isoMinDate, isoMaxDate)
   } else {
@@ -192,34 +192,27 @@ const triggerMetricsPipeline = (context) => {
 </script>
 
 <style scoped>
-/* Core Layouts & Structural Containers */
 .app-container { display: flex; flex-direction: column; width: 100vw; height: 100vh; overflow: hidden; background: var(--bg-main); transition: background .2s; }
 .app-nav-bar { display: flex; justify-content: space-between; align-items: center; padding: .5rem 1.5rem; background: var(--bg-nav); border-bottom: 1px solid var(--border-color); flex-shrink: 0; transition: background .2s, border-color .2s; }
 .nav-brand-group, .nav-context-dropdowns, .nav-controls { display: flex; align-items: center; gap: 16px; }
 .nav-context-dropdowns { gap: 10px; }
 .nav-controls { gap: 12px; }
 .view-viewport { flex: 1; min-height: 0; width: 100%; }
-
-/* Dropdown Custom Selectors */
 .select-wrapper { position: relative; display: inline-flex; align-items: center; width: 210px; }
 .select-wrapper::after { content: '▼'; font-size: 8px; color: var(--text-muted, #777); position: absolute; right: 12px; pointer-events: none; }
 .context-select { width: 100%; background: var(--bg-surface, #fff); color: var(--text-main, #0f172a); border: 1px solid var(--border-color, #e2e8f0); padding: 6px 32px 6px 12px; font-size: 0.75rem; font-weight: 700; border-radius: 6px; cursor: pointer; outline: none; appearance: none; transition: border-color .15s, background-color .15s, color .15s; }
 .context-select:hover:not(:disabled) { border-color: #38bdf8; }
 .context-select:disabled { opacity: 0.4; cursor: not-allowed; }
-
-/* Brand Assets & Pulse Badging */
 .dashboard-logo { width: 38px; height: 38px; border-radius: 50%; cursor: pointer; transition: transform .15s; }
 .dashboard-logo:hover { transform: scale(1.04); }
 .dashboard-logo:active { transform: scale(.98); }
 .status-badge { display: flex; align-items: center; gap: 6px; color: #34d399; font-size: 10px; font-weight: 700; background: rgba(52,211,153,0.06); border: 1px solid rgba(52,211,153,0.15); padding: 4px 10px; border-radius: 20px; }
 .pulse-dot { width: 6px; height: 6px; background: #34d399; border-radius: 50%; animation: glow 1.5s infinite; }
-
-/* Control Actions & Navigation Buttons */
 .nav-divider { width: 1px; height: 16px; background: var(--border-color); }
 .nav-controls button, .theme-toggle-btn { background: transparent; border: 1px solid var(--btn-border); color: var(--text-muted); font-size: .7rem; font-weight: 700; padding: 6px 14px; border-radius: 6px; cursor: pointer; transition: all .2s; }
 .nav-controls button:hover:not(:disabled), .theme-toggle-btn:hover { color: #10b981; border-color: #10b981; background: var(--btn-hover-bg); box-shadow: 0 0 6px rgba(16, 185, 129, 0.15); }
 .nav-controls button.active { background: var(--btn-hover-bg); color: var(--accent); border-color: var(--accent); box-shadow: 0 0 8px var(--accent-bg); }
-.nav-controls button.btn-disabled { opacity: .4; cursor: not-allowed; border-color: var(--border-color) !important; color: var(--text-muted) !important; }
-
+.signout-btn { border-color: #ef4444 !important; color: #ef4444 !important; }
+.signout-btn:hover { color: #ffffff !important; border-color: #ef4444 !important; background: #ef4444 !important; box-shadow: 0 0 6px rgba(239, 68, 68, 0.2) !important; }
 @keyframes glow { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }
 </style>
