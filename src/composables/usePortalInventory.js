@@ -1,4 +1,3 @@
-// Inside usePortalInventory.js
 import { ref, computed } from 'vue'
 import { supabase } from '../utils/supabase'
 
@@ -6,7 +5,7 @@ export function usePortalInventory() {
   const rawItems = ref([])
   const isLoading = ref(false)
   const activeCategoryFilter = ref('all')
-  const activeSortOrder = ref('alphabetical')
+  const activeSortOrder = ref('highest_value')
 
   const normalizeGroup = (groupName) => {
     const name = (groupName || '').toLowerCase().trim()
@@ -17,17 +16,13 @@ export function usePortalInventory() {
     return 'materials'
   }
 
-  // 🍇 Accept target area dynamically from view layer
   const loadPortalInventory = async (targetArea) => {
     if (!targetArea) return
-    
     isLoading.value = true
     try {
-      // 📡 Dispatches RPC passing the active filter property down to your sql parameter
       const { data, error } = await supabase.rpc('get_portal_inventory_details', {
-        target_area_name: targetArea // matches your database RPC argument parameter key
+        target_area_name: targetArea 
       })
-      
       if (error) throw error
       rawItems.value = data || []
     } catch (err) {
@@ -38,16 +33,15 @@ export function usePortalInventory() {
     }
   }
 
-const categoryTotals = computed(() => {
+  const categoryTotals = computed(() => {
     const totals = { materials: 0, chemicals: 0, fertilizer: 0, fuel_pol: 0 }
     rawItems.value.forEach(item => {
       const stock = Number(item.available_stock || 0)
       const cost = Number(item.unit_cost || 0)
-      const bucket = normalizeGroup(item.item_group)
-      totals[bucket] += (stock * cost)
+      totals[normalizeGroup(item.item_group)] += (stock * cost)
     })
     return totals
-  }) // 🍇 Fix: Add the missing closing parenthesis here!
+  })
 
   const overallTotalValue = computed(() => {
     return Object.values(categoryTotals.value).reduce((sum, val) => sum + val, 0)
@@ -72,15 +66,10 @@ const categoryTotals = computed(() => {
           computed_total_value: stock * cost
         }
       })
-      .filter(item => {
-        if (activeCategoryFilter.value === 'all') return true
-        return item.normalized_group === activeCategoryFilter.value
-      })
+      .filter(item => activeCategoryFilter.value === 'all' || item.normalized_group === activeCategoryFilter.value)
       .sort((a, b) => {
-        if (activeSortOrder.value === 'highest_value') {
-          if (b.computed_total_value !== a.computed_total_value) {
-            return b.computed_total_value - a.computed_total_value
-          }
+        if (activeSortOrder.value === 'highest_value' && b.computed_total_value !== a.computed_total_value) {
+          return b.computed_total_value - a.computed_total_value
         }
         return a.item_name.toLowerCase().localeCompare(b.item_name.toLowerCase())
       })

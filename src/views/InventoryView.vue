@@ -5,15 +5,16 @@
       v-model:sortOrder="activeSortOrder"
       :overall-total-value="overallTotalValue"
       :category-totals="categoryTotals"
+      @update:searchQuery="(q) => searchQuery = q"
       @export-csv="handleExportCSV"
-      @trigger-print="handleTriggerPrint"
+      @trigger-print="() => window.print()"
     />
 
     <div class="inventory-body-grid">
       <div class="inventory-list-panel">
         <div class="table-scroll-frame">
           <InventoryTable 
-            :items="filteredAndRankedItems"
+            :items="searchFilteredItems"
             :is-loading="isLoading"
             :sort-order="activeSortOrder"
             @item-inspect="triggerSmartSearch"
@@ -29,7 +30,7 @@
 </template>
 
 <script setup>
-import { onMounted, watch, ref } from 'vue'
+import { onMounted, watch, ref, computed } from 'vue'
 import { usePortalInventory } from '../composables/usePortalInventory'
 import { downloadCSV } from '../utils/exportUtils'
 import InventoryToolbar from '../components/InventoryToolbar.vue'
@@ -46,33 +47,42 @@ const {
   activeSortOrder,
   categoryTotals,
   overallTotalValue,
-  filteredAndRankedItems,
+  filteredAndRankedItems, 
   chartData,
   loadPortalInventory
 } = usePortalInventory()
 
-const isModalOpen = ref(false)
-const selectedItemName = ref('')
-const selectedItemGroup = ref('')
+const searchQuery = ref('')
+
+const searchFilteredItems = computed(() => {
+  const cleanQuery = searchQuery.value.toLowerCase().trim()
+  if (!cleanQuery) return filteredAndRankedItems.value
+
+  return filteredAndRankedItems.value.filter(item => 
+    item.item_name?.toLowerCase().includes(cleanQuery) ||
+    item.item_code?.toLowerCase().includes(cleanQuery) ||
+    item.item_group?.toLowerCase().includes(cleanQuery)
+  )
+})
 
 const triggerSmartSearch = (item) => {
-  selectedItemName.value = item.item_name
-  selectedItemGroup.value = item.item_group
-  isModalOpen.value = true
+  // If your modal component isn't ported to the portal yet, you can replace this with a log or notification banner hook
+  console.log('Inspecting Asset Record Context:', item)
 }
 
 const handleExportCSV = () => {
   const targetArea = props.selectedContext?.area || 'global'
   const targetSystem = props.selectedContext?.systemType || 'operations'
   const nameString = `${targetArea}-${targetSystem}-inventory`.toLowerCase().replace(/\s+/g, '_')
-  downloadCSV(filteredAndRankedItems.value, nameString)
+  downloadCSV(searchFilteredItems.value, nameString) 
 }
 
-const handleTriggerPrint = () => { window.print() }
-
 onMounted(async () => {
+  activeSortOrder.value = 'highest_value'
   if (props.selectedContext?.area) { await loadPortalInventory(props.selectedContext.area) }
 })
+
+watch(activeCategoryFilter, () => { searchQuery.value = '' })
 
 watch(
   () => props.selectedContext, 
