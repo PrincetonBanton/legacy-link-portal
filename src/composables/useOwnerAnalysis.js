@@ -1,8 +1,8 @@
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { supabase } from '../utils/supabase'
 
 export function useOwnerAnalysis() {
-  const isFetching = ref(false)
+  const isFetchingBase = ref(false)
   const isFetchingTrends = ref(false)
   const isFetchingBlocks = ref(false)
   const isFetchingProducts = ref(false)
@@ -15,8 +15,17 @@ export function useOwnerAnalysis() {
   const productMetricsData = ref([])
   const groupMetricsData = ref([])
 
+  // 🔄 Unified status hook to catch any sub-pipeline requests instantly
+  const isFetching = computed(() => {
+    return isFetchingBase.value || 
+           isFetchingTrends.value || 
+           isFetchingBlocks.value || 
+           isFetchingProducts.value || 
+           isFetchingGroups.value
+  })
+
   const loadEnterpriseData = async () => {
-    isFetching.value = true
+    isFetchingBase.value = true
     fetchError.value = null
     try {
       const { data, error } = await supabase.rpc('get_system_analysis_summary')
@@ -32,11 +41,10 @@ export function useOwnerAnalysis() {
       console.error(err)
       fetchError.value = err.message
     } finally {
-      isFetching.value = false
+      isFetchingBase.value = false
     }
   }
 
-  // 🚀 Optimized Server-Side Export RPC Pipeline Extraction
   const fetchRawExportDataset = async (area, systemType, startDate, endDate) => {
     try {
       const { data, error } = await supabase.rpc('export_raw_delivery_audit_log', {
@@ -45,7 +53,6 @@ export function useOwnerAnalysis() {
         start_date: startDate,
         end_date: endDate
       })
-
       if (error) throw error
       return data || []
     } catch (err) {
@@ -86,7 +93,6 @@ export function useOwnerAnalysis() {
         end_date: endDate
       })
       if (error) throw error
-
       blockMetricsData.value = (data || []).map(row => ({
         identifier: row.block_name,
         value: parseFloat(row.total_value || 0)
@@ -110,7 +116,6 @@ export function useOwnerAnalysis() {
         end_date: endDate
       })
       if (error) throw error
-
       productMetricsData.value = (data || []).map(row => ({
         identifier: row.product_name || row.identifier,
         value: parseFloat(row.total_value || 0)
@@ -134,7 +139,6 @@ export function useOwnerAnalysis() {
         end_date: endDate
       })
       if (error) throw error
-
       groupMetricsData.value = (data || []).map(row => ({
         identifier: row.group_name || row.identifier,
         value: parseFloat(row.total_value || 0)
@@ -160,7 +164,7 @@ export function useOwnerAnalysis() {
     productMetricsData, 
     groupMetricsData,   
     loadEnterpriseData, 
-    fetchRawExportDataset, // 🚀 Exposed out to view layouts
+    fetchRawExportDataset, 
     fetchTrends,
     fetchBlockAggregations,
     fetchProductAggregations, 

@@ -1,118 +1,26 @@
 <template>
   <div class="widescreen-analytics-hub">
+    <AnalyticsToolbar 
+      :active-dataset-type="activeDatasetType"
+      :selected-context="props.selectedContext"
+      :is-fetching="isFetching"
+      :is-generating="isGenerating"
+      :has-rows="!!currentTableRows?.length"
+      @fetch-trends="handleFetchTrendsClick"
+      @fetch-blocks="handleFetchBlocksClick"
+      @fetch-products="handleFetchProductsClick"
+      @fetch-groups="handleFetchGroupsClick"
+      @run-analysis="runDynamicDatasetAnalysis"
+    />
+
     <div class="split-layout">
       
       <div class="left-col">
-        <div class="step-testing-panel">
-          <button 
-            class="pipeline-btn theme-emerald" 
-            :class="{ 'is-active': activeDatasetType === 'trends' }"
-            @click="handleFetchTrendsClick" 
-            :disabled="isFetching"
-          >
-            {{ isFetching && activeDatasetType === 'trends' ? 'Fetching...' : 'Invoice' }}
-          </button>
-
-          <button 
-            class="pipeline-btn theme-sky" 
-            :class="{ 'is-active': activeDatasetType === 'blocks' }"
-            @click="handleFetchBlocksClick" 
-            :disabled="isFetching"
-          >
-            {{ isFetching && activeDatasetType === 'blocks' ? 'Fetching...' : 'Blocking' }}
-          </button>
-
-          <button 
-            class="pipeline-btn theme-purple" 
-            :class="{ 
-              'is-active': activeDatasetType === 'products',
-              'system-restricted': props.selectedContext?.systemType !== 'Production System'
-            }"
-            @click="handleFetchProductsClick" 
-            :disabled="isFetching || props.selectedContext?.systemType !== 'Production System'"
-          >
-            {{ isFetching && activeDatasetType === 'products' ? 'Fetching...' : 'Product' }}
-          </button>
-
-          <button 
-            class="pipeline-btn theme-pink" 
-            :class="{ 
-              'is-active': activeDatasetType === 'groups',
-              'system-restricted': props.selectedContext?.systemType === 'Production System'
-            }"
-            @click="handleFetchGroupsClick" 
-            :disabled="isFetching || props.selectedContext?.systemType === 'Production System'"
-          >
-            {{ isFetching && activeDatasetType === 'groups' ? 'Fetching...' : 'Category' }}
-          </button>
-
-          <button 
-            class="ai-trigger-btn" 
-            @click="runDynamicDatasetAnalysis" 
-            :disabled="isGenerating || !currentTableRows?.length"
-            :title="`Analyze ${activeDatasetType.toUpperCase()} Dataset`"
-          >
-            <span>{{ isGenerating ? 'Computing...' : 'Run AI ✨' }}</span>
-          </button>
-        </div>
-
-        <div class="table-container">
-          <h3>📊 Live {{ getTableTitle }}</h3>
-          
-          <div class="table-scroll-wrapper">
-            <table class="mock-table">
-              <thead>
-                <tr v-if="activeDatasetType === 'trends'">
-                  <th>Trend Date</th>
-                  <th>Invoice Count</th>
-                  <th>Total Financial Value</th>
-                </tr>
-                <tr v-else-if="activeDatasetType === 'blocks'">
-                  <th>Block Identifier</th>
-                  <th>Total Value</th>
-                </tr>
-                <tr v-else-if="activeDatasetType === 'products'">
-                  <th>Product Variant Code</th>
-                  <th>Aggregated Value</th>
-                </tr>
-                <tr v-else-if="activeDatasetType === 'groups'">
-                  <th>Logistical Group Class</th>
-                  <th>Aggregated Value</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-if="!currentTableRows || currentTableRows.length === 0">
-                  <td :colspan="activeDatasetType === 'trends' ? 3 : 2" class="empty-row-cell">
-                    No records found. Trigger an active pipeline node above.
-                  </td>
-                </tr>
-                
-                <template v-else>
-                  <tr v-if="activeDatasetType === 'trends'" v-for="(row, index) in currentTableRows" :key="'trend-' + index">
-                    <td class="product-name-cell">{{ row.trend_date }}</td>
-                    <td>{{ row.invoice_count }}</td>
-                    <td class="revenue-cell">₱{{ Number(row.total_financial_value || 0).toLocaleString(undefined, { minimumFractionDigits: 2 }) }}</td>
-                  </tr>
-
-                  <tr v-if="activeDatasetType === 'blocks'" v-for="(row, index) in currentTableRows" :key="'block-' + index">
-                    <td class="product-name-cell">{{ row.identifier }}</td>
-                    <td class="revenue-cell">₱{{ Number(row.value || 0).toLocaleString(undefined, { minimumFractionDigits: 2 }) }}</td>
-                  </tr>
-
-                  <tr v-if="activeDatasetType === 'products'" v-for="(row, index) in currentTableRows" :key="'prod-' + index">
-                    <td class="product-name-cell">{{ row.identifier || 'Unknown Product' }}</td>
-                    <td class="revenue-cell">₱{{ Number(row.value || 0).toLocaleString(undefined, { minimumFractionDigits: 2 }) }}</td>
-                  </tr>
-
-                  <tr v-if="activeDatasetType === 'groups'" v-for="(row, index) in currentTableRows" :key="'grp-' + index">
-                    <td class="product-name-cell">{{ row.group_name || row.identifier || 'Unknown Group' }}</td>
-                    <td class="revenue-cell">₱{{ Number(row.value || 0).toLocaleString(undefined, { minimumFractionDigits: 2 }) }}</td>
-                  </tr>
-                </template>
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <AnalyticsTable 
+          :active-dataset-type="activeDatasetType"
+          :table-title="getTableTitle"
+          :rows="currentTableRows"
+        />
       </div>
 
       <div class="right-col">
@@ -133,6 +41,8 @@
 <script setup>
 import { ref, watch, computed } from 'vue'
 import { useOwnerAnalysis } from '../composables/useOwnerAnalysis.js'
+import AnalyticsToolbar from '../components/graphscharts/AnalyticsToolbar.vue'
+import AnalyticsTable from '../components/graphscharts/AnalyticsTable.vue'
 
 const props = defineProps({
   selectedContext: {
@@ -275,48 +185,11 @@ watch(
 </script>
 
 <style scoped>
-/* Maximize Available Heights on Layout Containers */
-.widescreen-analytics-hub { width: 100%; min-height: 85vh; display: flex; padding: 2rem; box-sizing: border-box; background: #ffffff; font-family: system-ui, -apple-system, sans-serif; }
-.split-layout { display: flex; gap: 2.5rem; align-items: stretch; width: 100%; flex-grow: 1; }
+.widescreen-analytics-hub { width: 100%; min-height: 85vh; display: flex; flex-direction: column; padding: 2rem; box-sizing: border-box; background: #ffffff; font-family: system-ui, -apple-system, sans-serif; }
+.split-layout { display: flex; gap: 2.5rem; align-items: stretch; width: 100%; flex-grow: 1; margin-top: 0.5rem; }
 .left-col { flex: 1.2; display: flex; flex-direction: column; gap: 1.5rem; }
 .right-col { flex: 1; display: flex; }
 
-/* Upper Header Controls Dock without Dashed Border */
-.step-testing-panel { padding: 1rem; background: #f8fafc; border-radius: 8px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-
-/* Control Selection Button and Hover State Logic */
-.pipeline-btn { margin: 0; width: auto; padding: 8px 16px; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; border-radius: 50px; cursor: pointer; border: 1px solid transparent; color: white; opacity: 0.45; transition: opacity 0.2s ease, transform 0.1s ease; }
-.pipeline-btn:hover:not(:disabled) { opacity: 0.85; transform: translateY(-1px); }
-.pipeline-btn.is-active { opacity: 1 !important; transform: none !important; }
-.pipeline-btn:disabled { cursor: not-allowed; }
-
-/* System Context Filtering Behavior */
-.pipeline-btn.system-restricted { background: #64748b !important; opacity: 0.25 !important; cursor: not-allowed; }
-
-/* Background Theme Color Schemes */
-.pipeline-btn.theme-emerald { background: #10b981; }
-.pipeline-btn.theme-sky { background: #3b82f6; }
-.pipeline-btn.theme-purple { background: #8b5cf6; }
-.pipeline-btn.theme-pink { background: #ec4899; }
-
-/* Right-aligned Trigger Action Buttons */
-.ai-trigger-btn { margin-left: auto; background: #0f172a; color: white; border: none; padding: 8px 14px; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; border-radius: 50px; cursor: pointer; transition: background 0.15s ease, transform 0.1s ease; display: flex; align-items: center; gap: 4px; }
-.ai-trigger-btn:hover:not(:disabled) { background: #1e293b; transform: translateY(-1px); }
-.ai-trigger-btn:disabled { background: #cbd5e1; color: #94a3b8; cursor: not-allowed; }
-
-/* Grid View Scrolling Table Container Architecture */
-.table-container { text-align: left; display: flex; flex-direction: column; flex-grow: 1; width: 100%; }
-.table-container h3 { font-size: 0.9rem; color: #334155; margin: 0 0 1rem 0; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; }
-.table-scroll-wrapper { flex-grow: 1; max-height: 550px; overflow-y: auto; border: 1px solid #edf2f7; border-radius: 6px; background: #ffffff; }
-.mock-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; text-align: left; }
-.mock-table th { background: #f8fafc; color: #64748b; padding: 12px; border-bottom: 1px solid #edf2f7; font-weight: 800; font-size: 0.68rem; letter-spacing: 0.03em; position: sticky; top: 0; z-index: 1; }
-.mock-table td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #334155; font-family: ui-monospace, SFMono-Regular, monospace; font-size: 0.75rem; box-sizing: border-box; vertical-align: middle; }
-.product-name-cell { font-family: system-ui, sans-serif !important; font-weight: 600; color: #0f172a !important; }
-.revenue-cell { font-weight: 600; color: #16a34a; }
-.mock-table tr:hover td { background: #f8fafc; }
-.empty-row-cell { text-align: center; color: #94a3b8; padding: 30px; font-style: italic; }
-
-/* Lateral Insight Display Flex Architecture */
 .insights-panel { padding: 1.5rem; background: #f0fdf4; border-left: 4px solid #22c55e; border-radius: 8px; text-align: left; width: 100%; display: flex; flex-direction: column; flex-grow: 1; box-sizing: border-box; }
 .awaiting-panel { background: #f8fafc; border-left-color: #cbd5e1; }
 .error-panel { background: #fef2f2; border-left-color: #ef4444; }
@@ -326,6 +199,14 @@ watch(
 .insights-content { flex-grow: 1; overflow-y: auto; max-height: 580px; padding-right: 6px; }
 .status-text { color: #1e293b; font-size: 0.78rem; margin: 0; line-height: 1.6; white-space: pre-line; }
 .awaiting-panel .status-text { color: #94a3b8; font-style: italic; font-weight: 600; }
+
+/* Dynamic Print Mode Query Adjustments */
+@media print {
+  .step-testing-panel, .ai-trigger-btn, .btn-utility { display: none !important; }
+  .widescreen-analytics-hub { padding: 0; }
+  .split-layout { display: block; }
+  .right-col { margin-top: 2rem; }
+}
 
 @media (max-width: 900px) { .split-layout { flex-direction: column; gap: 2rem; } }
 </style>
