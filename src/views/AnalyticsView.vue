@@ -68,9 +68,17 @@ const currentTableRows = computed(() => {
 })
 
 const handleAnalyticsPrint = () => {
-  if (props.selectedContext) {
+  if (!props.selectedContext) return
+  
+  const frame = document.querySelector('.analytics-left-panel .table-scroll-frame')
+  const originalScroll = frame ? frame.scrollTop : 0
+  
+  if (frame) frame.scrollTop = 0
+  
+  // Tiny timeout to guarantee the browser updates the layout before saving
+  setTimeout(() => {
     exportToPDF(props.selectedContext, '.analytics-body-grid', true)
-  }
+  }, 50)
 }
 
 const handleFetchTrendsClick = async () => {

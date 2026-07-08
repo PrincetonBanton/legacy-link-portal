@@ -80,11 +80,17 @@ const handleExportCSV = () => {
 }
 
 const handleInventoryPrint = () => {
-  if (props.selectedContext) {
+  if (!props.selectedContext) return
+  
+  const frame = document.querySelector('.inventory-left-panel .table-scroll-frame')
+  const originalScroll = frame ? frame.scrollTop : 0
+  
+  if (frame) frame.scrollTop = 0
+  
+  setTimeout(() => {
     exportToPDF(props.selectedContext, '.inventory-body-grid', true)
-  }
+  }, 50)
 }
-
 onMounted(async () => {
   activeSortOrder.value = 'highest_value'
   if (props.selectedContext?.area) { await loadPortalInventory(props.selectedContext.area) }
