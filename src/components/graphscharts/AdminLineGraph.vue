@@ -1,6 +1,9 @@
 <template>
   <div class="visual-card line-trend-panel">
-    <div class="card-header">Daily Invoices</div>
+    <div class="card-header">
+      {{ formattedHeaderTitle }}
+    </div>
+    
     <div class="chart-container-frame">
       <div v-if="chartData?.datasets?.[0]?.data?.length" class="chart-wrapper">
         <Line :data="computedChartData" :options="chartOptions" />
@@ -17,7 +20,22 @@ import { Chart as ChartJS, Title, Tooltip, Legend, LineElement, PointElement, Li
 
 ChartJS.register(Title, Tooltip, Legend, LineElement, PointElement, LinearScale, CategoryScale, Filler)
 
-const props = defineProps({ chartData: { type: Object, required: true } })
+const props = defineProps({ 
+  chartData: { type: Object, required: true },
+  areaName: { type: String, default: '' },
+  systemType: { type: String, default: '' }
+})
+
+// 🔤 Combines the fields into: "[AREA] [SYSTEM] DAILY INVOICES"
+const formattedHeaderTitle = computed(() => {
+  const area = props.areaName ? props.areaName.trim() : 'GLOBAL'
+  const system = props.systemType ? props.systemType.trim() : 'OPERATIONS'
+  
+  // Strips word "System" if it's already trailing in systemType to avoid "PRODUCTION SYSTEM DAILY INVOICES"
+  const cleanSystem = system.toUpperCase().replace(/\bSYSTEM\b/g, '').trim()
+  
+  return `${area.toUpperCase()} ${cleanSystem} `.replace(/\s+/g, ' ')
+})
 
 const computedChartData = computed(() => {
   if (!props.chartData || !props.chartData.datasets) return props.chartData
@@ -61,7 +79,6 @@ const chartOptions = {
     }
   },
   scales: {
-    /* 🌟 Translucent slate-gray gridlines visible in both light & dark themes */
     x: { 
       grid: { color: 'rgba(100, 116, 139, 0.12)', drawTicks: false }, 
       ticks: { color: '#64748b', font: { size: 9 } } 
@@ -80,11 +97,8 @@ const chartOptions = {
 .card-header { font-size: 0.8rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; background: var(--bg-nav); padding: 0.4rem 0.75rem; border-bottom: 1px solid var(--border-color); text-align: left; letter-spacing: 0.02em; transition: background .25s ease, border-color .25s ease, color .25s ease; }
 .chart-container-frame { flex: 1; position: relative; width: 100%; height: 100%; min-height: 0; padding: 0.5rem 0.75rem; box-sizing: border-box; display: flex; flex-direction: column; }
 .chart-wrapper { flex: 1; width: 100%; height: 100%; position: relative; min-height: 0; }
-
-/* 📈 Adaptive State for Line Chart Placeholders */
 .chart-placeholder { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 0.8rem; font-weight: 500; height: 100%; transition: background .25s ease, color .25s ease; }
 
-/* Dynamic gradient backgrounds mapping cleanly to active dashboard theme selection */
 :global(.dark-theme) .chart-placeholder { background: radial-gradient(circle at center, #131c2e 0%, #0f172a 100%); }
 :global(.light-theme) .chart-placeholder { background: radial-gradient(circle at center, #f8fafc 0%, #f1f5f9 100%); }
 </style>

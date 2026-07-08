@@ -1,5 +1,5 @@
 <template>
-  <div class="widescreen-analytics-hub">
+  <div class="analytics-view-wrapper">
     <AnalyticsToolbar 
       :active-dataset-type="activeDatasetType"
       :selected-context="props.selectedContext"
@@ -11,29 +11,25 @@
       @fetch-products="handleFetchProductsClick"
       @fetch-groups="handleFetchGroupsClick"
       @run-analysis="runDynamicDatasetAnalysis"
+      @trigger-print="handleAnalyticsPrint" 
     />
 
-    <div class="split-layout">
-      
-      <div class="left-col">
-        <AnalyticsTable 
-          :active-dataset-type="activeDatasetType"
-          :table-title="getTableTitle"
-          :rows="currentTableRows"
-        />
-      </div>
-
-      <div class="right-col">
-        <div class="insights-panel" :class="{ 'error-panel': hasError, 'awaiting-panel': !aiResponse }">
-          <div class="panel-header">
-            <strong>{{ hasError ? 'Diagnostic Error Log:' : 'AI Executive Summary:' }}</strong>
-          </div>
-          <div class="insights-content">
-            <p class="status-text">{{ aiResponse || 'Awaiting execution request. Click the action button to process the dataset grid matrix...' }}</p>
-          </div>
+    <div class="analytics-body-grid">
+      <div class="analytics-left-panel">
+        <div class="table-scroll-frame">
+          <AnalyticsTable 
+            :active-dataset-type="activeDatasetType"
+            :rows="currentTableRows"
+          />
         </div>
       </div>
 
+      <div class="analytics-right-panel">
+        <AnalyticsInsightPanel 
+          :ai-response="aiResponse"
+          :has-error="hasError"
+        />
+      </div>
     </div>
   </div>
 </template>
@@ -41,26 +37,19 @@
 <script setup>
 import { ref, watch, computed } from 'vue'
 import { useOwnerAnalysis } from '../composables/useOwnerAnalysis.js'
-import AnalyticsToolbar from '../components/graphscharts/AnalyticsToolbar.vue'
+import { exportToPDF } from '../utils/dashboardActions.js' 
+
+import AnalyticsToolbar from '../components/AnalyticsToolbar.vue'
 import AnalyticsTable from '../components/graphscharts/AnalyticsTable.vue'
+import AnalyticsInsightPanel from '../components/graphscharts/AnalyticsInsightPanel.vue'
 
 const props = defineProps({
-  selectedContext: {
-    type: Object,
-    default: null
-  }
+  selectedContext: { type: Object, default: null }
 })
 
 const { 
-  isFetching, 
-  dailyTrendsData, 
-  blockMetricsData, 
-  productMetricsData, 
-  groupMetricsData, 
-  fetchTrends, 
-  fetchBlockAggregations,
-  fetchProductAggregations,
-  fetchGroupAggregations
+  isFetching, dailyTrendsData, blockMetricsData, productMetricsData, groupMetricsData, 
+  fetchTrends, fetchBlockAggregations, fetchProductAggregations, fetchGroupAggregations
 } = useOwnerAnalysis()
 
 const activeDatasetType = ref('trends')
@@ -70,13 +59,6 @@ const hasError = ref(false)
 
 const endpoint = 'https://api.groq.com/openai/v1/chat/completions'
 
-const getTableTitle = computed(() => {
-  if (activeDatasetType.value === 'trends') return 'Daily Operational Trends'
-  if (activeDatasetType.value === 'blocks') return 'Sector Block Aggregations'
-  if (activeDatasetType.value === 'products') return 'Product Inventory Breakdown'
-  return 'Logistical Category Group Aggregations'
-})
-
 const currentTableRows = computed(() => {
   if (activeDatasetType.value === 'trends') return dailyTrendsData.value
   if (activeDatasetType.value === 'blocks') return blockMetricsData.value
@@ -84,6 +66,12 @@ const currentTableRows = computed(() => {
   if (activeDatasetType.value === 'groups') return groupMetricsData.value
   return []
 })
+
+const handleAnalyticsPrint = () => {
+  if (props.selectedContext) {
+    exportToPDF(props.selectedContext, '.analytics-body-grid', true)
+  }
+}
 
 const handleFetchTrendsClick = async () => {
   if (!props.selectedContext?.area) return alert("⚠️ No enterprise area chosen yet!")
@@ -137,17 +125,9 @@ const runDynamicDatasetAnalysis = async () => {
     messages: [
       { 
         role: "system", 
-        content: `You are an expert data analyst, and data comes from agriculture crops operation mainly pomelo, durian, mango. Review the following snapshot data layer containing ${pipelineContextDesc}.
-                  Provide a brief, high-impact bulleted analysis using exactly these four structured headers:
-                    1. The Operational Pulse Audit (Executive Summary)
-                    2. Dynamic Anomaly Detection
-                    3. Preventive Maintenance / Action Items
-                    4. Projection`
+        content: `You are an expert data analyst, and data comes from agriculture crops operation mainly pomelo, durian, mango. Review the following snapshot data layer containing ${pipelineContextDesc}.\nProvide a brief, high-impact bulleted analysis using exactly these four structured headers:\n1. The Operational Pulse Audit (Executive Summary)\n2. Dynamic Anomaly Detection\n3. Preventive Maintenance / Action Items\n4. Projection`
       },
-      { 
-        role: "user", 
-        content: `Analyze this active payload object grid: ${JSON.stringify(currentTableRows.value)}` 
-      }
+      { role: "user", content: `Analyze this active payload object grid: ${JSON.stringify(currentTableRows.value)}` }
     ],
     temperature: 0.2,
     max_tokens: 1200
@@ -185,28 +165,15 @@ watch(
 </script>
 
 <style scoped>
-.widescreen-analytics-hub { width: 100%; min-height: 85vh; display: flex; flex-direction: column; padding: 2rem; box-sizing: border-box; background: #ffffff; font-family: system-ui, -apple-system, sans-serif; }
-.split-layout { display: flex; gap: 2.5rem; align-items: stretch; width: 100%; flex-grow: 1; margin-top: 0.5rem; }
-.left-col { flex: 1.2; display: flex; flex-direction: column; gap: 1.5rem; }
-.right-col { flex: 1; display: flex; }
+/* 🖥️ SCREEN (BALANCED 50/50 SPLIT) */
+.analytics-view-wrapper { display: flex; flex-direction: column; width: 100%; height: 100vh; box-sizing: border-box; padding: 1rem; overflow: hidden; }
+.analytics-body-grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto 1fr; gap: 16px; width: 100%; flex: 1; min-height: 0; }
+.analytics-left-panel { grid-column: 1; display: flex; flex-direction: column; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; min-width: 0; height: 100%; overflow: hidden; }
+.analytics-right-panel { grid-column: 2; display: flex; flex-direction: column; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; min-width: 0; height: 100%; overflow: hidden; }
+.table-scroll-frame { flex: 1; overflow-y: auto; padding: 0; min-height: 0; }
 
-.insights-panel { padding: 1.5rem; background: #f0fdf4; border-left: 4px solid #22c55e; border-radius: 8px; text-align: left; width: 100%; display: flex; flex-direction: column; flex-grow: 1; box-sizing: border-box; }
-.awaiting-panel { background: #f8fafc; border-left-color: #cbd5e1; }
-.error-panel { background: #fef2f2; border-left-color: #ef4444; }
-.panel-header { font-size: 0.68rem; color: #166534; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; margin-bottom: 1rem; border-bottom: 1px dashed rgba(0,0,0,0.08); padding-bottom: 6px; }
-.awaiting-panel .panel-header { color: #475569; }
-.error-panel .panel-header { color: #991b1b; }
-.insights-content { flex-grow: 1; overflow-y: auto; max-height: 580px; padding-right: 6px; }
-.status-text { color: #1e293b; font-size: 0.78rem; margin: 0; line-height: 1.6; white-space: pre-line; }
-.awaiting-panel .status-text { color: #94a3b8; font-style: italic; font-weight: 600; }
-
-/* Dynamic Print Mode Query Adjustments */
-@media print {
-  .step-testing-panel, .ai-trigger-btn, .btn-utility { display: none !important; }
-  .widescreen-analytics-hub { padding: 0; }
-  .split-layout { display: block; }
-  .right-col { margin-top: 2rem; }
-}
-
-@media (max-width: 900px) { .split-layout { flex-direction: column; gap: 2rem; } }
+/* 🖨️ PRINT (FLUID STACKING OVERRIDES) */
+:global(.html2pdf__container) .analytics-view-wrapper, :global(.html2pdf__container) .analytics-body-grid { display: block !important; height: auto !important; max-height: none !important; overflow: visible !important; width: 100% !important; }
+:global(.html2pdf__container) .analytics-left-panel, :global(.html2pdf__container) .analytics-right-panel { display: block !important; width: 100% !important; height: auto !important; max-height: none !important; overflow: visible !important; grid-column: auto !important; }
+:global(.html2pdf__container) .table-scroll-frame { overflow: visible !important; height: auto !important; max-height: none !important; display: block !important; }
 </style>
